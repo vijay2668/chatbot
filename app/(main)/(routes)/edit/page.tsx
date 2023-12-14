@@ -1,12 +1,12 @@
-import EditPage from '@/components/edit';
+
+import { ModalProvider } from '@/components/modal-provider';
 import { currentProfile } from '@/lib/current-profile';
-import { initPinecone } from '@/lib/pinecone-client';
 import React from 'react';
 
 const dashboard = async () => {
   const profile = await currentProfile();
-
-  return <EditPage user={profile} />;
+  
+  return <ModalProvider user={profile}/>;
 };
 
 export default dashboard;

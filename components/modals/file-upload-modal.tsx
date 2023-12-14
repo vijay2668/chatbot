@@ -1,7 +1,6 @@
 'use client';
 
 import axios from 'axios';
-// import qs from "query-string";
 import * as z from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -28,12 +27,17 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import toast from 'react-hot-toast';
-import { Switch } from './ui/switch';
-import { Label } from './ui/label';
 import { initPinecone } from '@/lib/pinecone-client';
+import { useModal } from '@/hooks/use-modal-store';
+import { Switch } from '../ui/switch';
+import { Label } from '../ui/label';
 
-const EditPage = ({ user }: any) => {
-  const [index, setindex] = useState<any>([]);
+export const FileUploadModal = ({ user }: any) => {
+
+    const [index, setindex] = useState<any>([]);
+  const { isOpen, onClose, type } = useModal();
+
+  const isModalOpen = isOpen && type === 'file';
 
   useEffect(() => {
     const check = async () => {
@@ -119,7 +123,7 @@ const EditPage = ({ user }: any) => {
 
   const handleClose = () => {
     form.reset();
-    router.push('/');
+    onClose();
   };
 
   const isLoading = form.formState.isSubmitting;
@@ -132,6 +136,7 @@ const EditPage = ({ user }: any) => {
           if (res.status === 200) {
             toast.success('Bot Trained');
             form.reset();
+            onClose();
             router.push('/');
           }
           console.log('res', res);
@@ -146,6 +151,7 @@ const EditPage = ({ user }: any) => {
       if (res.status === 200) {
         toast.success('Bot Trained');
         form.reset();
+        onClose();
         router.push('/');
       }
     } catch (error: any) {
@@ -163,8 +169,9 @@ const EditPage = ({ user }: any) => {
     return null;
   }
 
+
   return (
-    <Dialog open={true} onOpenChange={handleClose}>
+    <Dialog open={isModalOpen} onOpenChange={handleClose}>
       <DialogContent className="bg-white text-black p-0 max-h-screen overflow-hidden flex flex-col">
         <DialogHeader className="pt-2 px-6">
           <DialogTitle className="text-2xl text-center font-bold">
@@ -293,6 +300,5 @@ const EditPage = ({ user }: any) => {
         </Form>
       </DialogContent>
     </Dialog>
-  );
-};
-export default EditPage;
+  )
+}

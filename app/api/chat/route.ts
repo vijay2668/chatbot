@@ -20,11 +20,8 @@ async function initPinecone({ botAPI, botEnvironment }: any) {
 }
 
 export async function POST(req: Request) {
-  const { question, history, botName, botAPI, botEnvironment } =
+  const { question, history, botAPI, botEnvironment, botName } =
     await req.json();
-
-  console.log('question', question);
-  console.log('history', history);
 
   //only accept post requests
   if (req.method !== 'POST') {
@@ -88,9 +85,7 @@ export async function POST(req: Request) {
         return [`Human: ${message[0]}`, `Assistant: ${message[1]}`].join('\n');
       })
       .join('\n');
-    console.log(pastMessages);
-
-    console.log('pass');
+    // console.log(pastMessages);
 
     //Ask a question using chat history
     const response = await chain.invoke({
@@ -100,7 +95,7 @@ export async function POST(req: Request) {
 
     const sourceDocuments = await documentPromise;
 
-    console.log('response', response);
+    // console.log('response', response);
 
     return NextResponse.json({ text: response, sourceDocuments });
   } catch (error: any) {
