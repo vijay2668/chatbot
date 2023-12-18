@@ -32,10 +32,10 @@ import { Separator } from '../ui/separator';
 import { Checkbox } from '../ui/checkbox';
 import { cn } from '@/lib/utils';
 
-export const WebsiteModal = ({ user }: any) => {
+export const EditWebsiteModal = ({ user }: any) => {
   const { isOpen, onClose, type } = useModal();
 
-  const isModalOpen = isOpen && type === 'website';
+  const isModalOpen = isOpen && type === 'editWebsite';
 
   const router = useRouter();
 
@@ -47,9 +47,6 @@ export const WebsiteModal = ({ user }: any) => {
       message: 'Chatbot Name is required',
     }),
     chatbotInstructions: z.string().optional(),
-    openAIAPIkey: z.string().min(1, {
-      message: 'OpenAI API key is required',
-    }),
   });
 
   const form = useForm({
@@ -58,15 +55,8 @@ export const WebsiteModal = ({ user }: any) => {
       websiteURL: '',
       chatbotName: '',
       chatbotInstructions: '',
-      openAIAPIkey: '',
     },
   });
-
-  useEffect(() => {
-    if (user) {
-      form.setValue('openAIAPIkey', user.openAIAPIkey);
-    }
-  }, [form, user]);
 
   const [urls, setUrls] = useState([]);
   const [selectedUrls, setSelectedUrls] = useState([]);
@@ -91,6 +81,7 @@ export const WebsiteModal = ({ user }: any) => {
     try {
       const res = await axios.post('/api/createAssistantWithWebsite', {
         ...values,
+        openAIAPIkey: user?.openAIAPIkey,
         websiteURLs: selectedUrls,
       });
       if (res.status === 200) {
@@ -214,28 +205,6 @@ export const WebsiteModal = ({ user }: any) => {
                             disabled={isLoading}
                             className="bg-zinc-300/50 border-0 focus-visible:ring-0 text-black focus-visible:ring-offset-0"
                             placeholder="Enter Chatbot Instructions"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="openAIAPIkey"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="uppercase whitespace-nowrap text-xs font-bold text-zinc-500 dark:text-secondary/70">
-                          OpenAI API Key
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            readOnly={user?.openAIAPIkey}
-                            disabled={isLoading}
-                            className="bg-zinc-300/50 read-only:text-black/70 read-only:bg-zinc-300/30 read-only:cursor-not-allowed border-0 focus-visible:ring-0 text-black focus-visible:ring-offset-0"
-                            placeholder="Enter OpenAI API Key"
                             {...field}
                           />
                         </FormControl>

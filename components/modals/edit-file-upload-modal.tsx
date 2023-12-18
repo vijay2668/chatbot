@@ -26,12 +26,13 @@ import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import toast from 'react-hot-toast';
 import { useModal } from '@/hooks/use-modal-store';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Switch } from '../ui/switch';
 
-export const FileUploadModal = ({ user }: any) => {
-  const { isOpen, onClose, type } = useModal();
-
-  const isModalOpen = isOpen && type === 'file';
+export const EditFileUploadModal = ({ user }: any) => {
+  const { isOpen, data, onClose, type } = useModal();
+  const [checked, setChecked] = useState(false);
+  const isModalOpen = isOpen && type === 'editFile';
   const router = useRouter();
 
   const formSchema = z.object({
@@ -40,9 +41,6 @@ export const FileUploadModal = ({ user }: any) => {
       message: 'Chatbot Name is required',
     }),
     chatbotInstructions: z.string().optional(),
-    openAIAPIkey: z.string().min(1, {
-      message: 'OpenAI API key is required',
-    }),
   });
 
   const form = useForm({
@@ -51,15 +49,15 @@ export const FileUploadModal = ({ user }: any) => {
       files: [],
       chatbotName: '',
       chatbotInstructions: '',
-      openAIAPIkey: '',
     },
   });
 
   useEffect(() => {
-    if (user) {
-      form.setValue('openAIAPIkey', user.openAIAPIkey);
+    if (data && user) {
+      form.setValue('chatbotName', data.name);
+      form.setValue('chatbotInstructions', data.instructions);
     }
-  }, [form, user]);
+  }, [data, form, user]);
 
   const handleClose = () => {
     form.reset();
@@ -70,7 +68,7 @@ export const FileUploadModal = ({ user }: any) => {
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
-      const { files, openAIAPIkey, chatbotName, chatbotInstructions } = values;
+      const { files, chatbotName, chatbotInstructions } = values;
 
       if (files.length === 0) {
         toast.error('At least one file is required');
@@ -82,12 +80,19 @@ export const FileUploadModal = ({ user }: any) => {
         formData.append('files', file);
       }
 
+      if (!checked && data?.file_ids) {
+        for (let file_id of data?.file_ids) {
+          formData.append('file_ids', file_id);
+        }
+      }
+
       formData.append('chatbotName', chatbotName);
       formData.append('chatbotInstructions', chatbotInstructions || '');
-      formData.append('openAIAPIkey', openAIAPIkey);
+      formData.append('openAIAPIkey', user?.openAIAPIkey);
+      formData.append('assistantId', data?.id);
 
       const response = await axios.post(
-        '/api/createAssistantWithFiles',
+        '/api/updateAssistantWithFiles',
         formData,
         {
           headers: { 'Content-Type': 'multipart/form-data' },
@@ -96,7 +101,7 @@ export const FileUploadModal = ({ user }: any) => {
 
       console.log(response);
       if (response.status === 200) {
-        toast.success('Assistant Created');
+        toast.success('Assistant Updated');
         form.reset();
         onClose();
         router.push('/');
@@ -191,27 +196,12 @@ export const FileUploadModal = ({ user }: any) => {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="openAIAPIkey"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="uppercase text-xs font-bold text-zinc-500 dark:text-secondary/70">
-                      OpenAI API Key
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        readOnly={user?.openAIAPIkey}
-                        disabled={isLoading}
-                        className="bg-zinc-300/50 read-only:text-black/70 read-only:bg-zinc-300/30 read-only:cursor-not-allowed border-0 focus-visible:ring-0 text-black focus-visible:ring-offset-0"
-                        placeholder="Enter OpenAI API Key"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <FormItem className="flex flex-col">
+                <FormLabel className="uppercase text-xs font-bold text-zinc-500 dark:text-secondary/70">
+                  On - If want to replace with existing data
+                </FormLabel>
+                <Switch onCheckedChange={setChecked} checked={checked} />
+              </FormItem>
             </div>
             <DialogFooter className="bg-gray-100 px-6 py-2">
               <Button variant="primary" disabled={isLoading}>

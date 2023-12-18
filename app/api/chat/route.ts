@@ -3,101 +3,94 @@ import { OpenAIEmbeddings } from 'langchain/embeddings/openai';
 import { PineconeStore } from 'langchain/vectorstores/pinecone';
 import { makeChain } from '@/lib/makechain';
 import { NextResponse } from 'next/server';
-import { Pinecone } from '@pinecone-database/pinecone';
-
-async function initPinecone({ botAPI, botEnvironment }: any) {
-  try {
-    const pinecone = new Pinecone({
-      environment: botEnvironment, //this is in the dashboard
-      apiKey: botAPI,
-    });
-
-    return pinecone;
-  } catch (error) {
-    console.log('error', error);
-    throw new Error('Failed to initialize Pinecone Client');
-  }
-}
+import { currentProfile } from '@/lib/current-profile';
+import {
+  createMessage,
+  createThread,
+  getMessages,
+  runAssistant,
+  runCheck,
+} from '@/lib/OpenAI';
+import OpenAI from 'openai';
 
 export async function POST(req: Request) {
-  const { question, history, botAPI, botEnvironment, botName } =
-    await req.json();
+  const profile = await currentProfile();
+
+  const { currentThread, question, assistant, openAIAPIkey } = await req.json();
 
   //only accept post requests
-  if (req.method !== 'POST') {
-    return new NextResponse('method not allowed', { status: 405 });
+  if (!profile) {
+    return new NextResponse('Unauthorized', { status: 401 });
   }
 
   if (!question) {
     return new NextResponse('No question in the request', { status: 400 });
   }
 
-  if (!botName || botName === '') {
-    return new NextResponse('bot name is missing', { status: 402 });
+  if (!openAIAPIkey) {
+    return new NextResponse('OpenAI api key is missing', { status: 402 });
   }
 
-  if (!botAPI || botAPI === '') {
-    return new NextResponse('bot api is missing', { status: 402 });
-  }
-  if (!botEnvironment || botEnvironment === '') {
-    return new NextResponse('bot environment is missing', { status: 402 });
+  if (!assistant) {
+    return new NextResponse('Current Assistant is missing', { status: 402 });
   }
 
-  const pinecone = await initPinecone({ botAPI, botEnvironment });
+  if (!currentThread) {
+    return new NextResponse('Thread id is missing', { status: 402 });
+  }
+
+  const openai = new OpenAI({
+    apiKey: openAIAPIkey,
+  });
+
   // OpenAI recommends replacing newlines with spaces for best results
   const sanitizedQuestion = question.trim().replaceAll('\n', ' ');
 
   try {
-    const index = pinecone.Index(botName);
-
-    /* create vectorstore*/
-    console.log('index', index);
-    const vectorStore = await PineconeStore.fromExistingIndex(
-      new OpenAIEmbeddings({}),
-      {
-        pineconeIndex: index,
-        textKey: 'text',
-        // namespace: PINECONE_NAME_SPACE, //namespace comes from your config folder
-      },
-    );
-
-    console.log('vectorStore', vectorStore);
-    // Use a callback to get intermediate sources from the middle of the chain
-    let resolveWithDocuments: (value: Document[]) => void;
-    const documentPromise = new Promise<Document[]>((resolve) => {
-      resolveWithDocuments = resolve;
-    });
-    const retriever = vectorStore.asRetriever({
-      callbacks: [
-        {
-          handleRetrieverEnd(documents) {
-            resolveWithDocuments(documents);
-          },
-        },
-      ],
+    const userMessage = await createMessage({
+      threadId: currentThread.id,
+      content: sanitizedQuestion,
+      openai,
     });
 
-    //create chain
-    const chain = makeChain(retriever);
+    console.log('userMessage', userMessage);
 
-    const pastMessages = history
-      .map((message: [string, string]) => {
-        return [`Human: ${message[0]}`, `Assistant: ${message[1]}`].join('\n');
-      })
-      .join('\n');
-    // console.log(pastMessages);
-
-    //Ask a question using chat history
-    const response = await chain.invoke({
-      question: sanitizedQuestion,
-      chat_history: pastMessages,
+    const run = await runAssistant({
+      assistantId: assistant.id,
+      threadId: currentThread.id,
+      instructions: assistant.instructions,
+      openai,
     });
 
-    const sourceDocuments = await documentPromise;
+    let runStatus = await runCheck({
+      threadId: currentThread.id,
+      runId: run.id,
+      openai,
+    });
 
-    // console.log('response', response);
+    while (runStatus.status !== 'completed') {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      runStatus = await runCheck({
+        threadId: currentThread.id,
+        runId: run.id,
+        openai,
+      });
+      console.log(runStatus)
+    }
 
-    return NextResponse.json({ text: response, sourceDocuments });
+    // unable to get all messages
+    const messages = await getMessages(currentThread.id, openai);
+
+    const lastMessageForRun = messages.data
+      .filter(
+        (message: any) =>
+          message.run_id === run.id && message.role === 'assistant',
+      )
+      .pop();
+
+    console.log(lastMessageForRun)
+
+    return NextResponse.json(lastMessageForRun);
   } catch (error: any) {
     console.log('error', error);
     return new NextResponse('Something went wrong', { status: 500 });

@@ -9,12 +9,10 @@ datasource db {
 }
 
 model Profile {
-  id             String @id @default(auto()) @map("_id") @db.ObjectId
-  userId         String @unique
-  botAPI         String
-  botEnvironment String
-  botName        String
-  botFiles       String
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @unique
+
+  openAIAPIkey String?
 
   createdAt DateTime @default(now())
 }

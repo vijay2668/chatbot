@@ -1,6 +1,6 @@
-import { auth } from "@clerk/nextjs";
+import { auth } from '@clerk/nextjs';
 
-import { db } from "@/lib/db";
+import { db } from '@/lib/db';
 
 export const currentProfile = async () => {
   const { userId } = auth();
@@ -11,9 +11,17 @@ export const currentProfile = async () => {
 
   const profile = await db.profile.findUnique({
     where: {
-      userId
-    }
+      userId,
+    },
   });
 
+  if (!profile) {
+    await db.profile.create({
+      data: {
+        userId,
+      },
+    });
+  }
+
   return profile;
-}
+};

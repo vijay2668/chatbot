@@ -10,28 +10,66 @@ import { Document } from 'langchain/document';
 import { UserButton } from '@clerk/nextjs';
 import Link from 'next/link';
 import axios from 'axios';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './accordion';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from './accordion';
+import OpenAI from 'openai';
+import { createThread, getAssistants } from '@/lib/OpenAI';
+import { Combobox } from './ui/combo-box';
 
 export default function ChatBot({ user }: any) {
+  const [assistants, setAssistants] = useState([]);
+  const [openai, setOpenai] = useState<any>(null);
+  const [currentChatbot, setCurrentChatbot] = useState<any>(null);
+  const [currentThread, setCurrentThread] = useState<any>(null);
+
+  useEffect(() => {
+    if (user?.openAIAPIkey) {
+      const fetchOpenAIAPIKey = () => {
+        const openai: any = new OpenAI({
+          apiKey: user?.openAIAPIkey,
+          dangerouslyAllowBrowser: true,
+        });
+        setOpenai(openai);
+      };
+      fetchOpenAIAPIKey();
+    }
+  }, [user?.openAIAPIkey]);
+
+  useEffect(() => {
+    if (openai) {
+      const fetchAssistant = async () => {
+        const chatbots = await getAssistants(openai);
+        setAssistants(chatbots);
+      };
+      fetchAssistant();
+    }
+  }, [openai]);
+
+  useEffect(() => {
+    const createFirstThread = async () => {
+      const thread = await createThread(openai);
+      setCurrentThread(thread);
+    };
+    createFirstThread();
+  }, [openai]);
+
   const [query, setQuery] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [messageState, setMessageState] = useState<{
-    messages: Message[];
-    pending?: string;
-    history: [string, string][];
-    pendingSourceDocs?: Document[];
-  }>({
-    messages: [
-      {
-        message: `👋 Hello there! Welcome to our ${user?.botName}!`,
-        type: 'apiMessage',
-      },
-    ],
-    history: [],
-  });
+  const [messages, setMessages] = useState<any>([]);
 
-  const { messages, history } = messageState;
+  useEffect(() => {
+    setMessages([
+      {
+        message: `👋 Hello there! Welcome to our ${currentChatbot?.name}!`,
+        role: 'bot',
+      },
+    ]);
+  }, [currentChatbot?.name]);
 
   const messageListRef = useRef<HTMLDivElement>(null);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
@@ -53,16 +91,13 @@ export default function ChatBot({ user }: any) {
 
     const question = query.trim();
 
-    setMessageState((state) => ({
-      ...state,
-      messages: [
-        ...state.messages,
-        {
-          type: 'userMessage',
-          message: question,
-        },
-      ],
-    }));
+    setMessages((prevChats: any) => [
+      ...prevChats,
+      {
+        role: 'user',
+        message: question,
+      },
+    ]);
 
     setLoading(true);
     setQuery('');
@@ -70,36 +105,32 @@ export default function ChatBot({ user }: any) {
     try {
       const response = await axios.post('/api/chat', {
         question,
-        history,
-        botAPI: user?.botAPI,
-        botEnvironment: user?.botEnvironment,
-        botName: user?.botName
+        assistant: currentChatbot,
+        openAIAPIkey: user?.openAIAPIkey,
+        currentThread: currentThread,
       });
       const data = await response.data;
-      console.log('data', data);
+      // console.log('data', data);
 
       if (data.error) {
         setError(data.error);
       } else {
-        setMessageState((state) => ({
-          ...state,
-          messages: [
-            ...state.messages,
-            {
-              type: 'apiMessage',
-              message: data.text,
-              sourceDocs: data.sourceDocuments,
-            },
-          ],
-          history: [...state.history, [question, data.text]],
-        }));
+        setMessages((prevChats: any) => [
+          ...prevChats,
+          {
+            role: 'bot',
+            message: data.content[0].text.value,
+          },
+        ]);
       }
-      console.log('messageState', messageState);
 
       setLoading(false);
 
       //scroll to bottom
-      messageListRef.current?.scrollTo(0, messageListRef.current.scrollHeight);
+      messageListRef?.current?.scrollTo(
+        0,
+        messageListRef?.current?.scrollHeight,
+      );
     } catch (error) {
       setLoading(false);
       setError('An error occurred while fetching the data. Please try again.');
@@ -133,7 +164,11 @@ export default function ChatBot({ user }: any) {
           </div>
         </header>
         <div>
-          <main className="flex w-full flex-1 flex-col overflow-hidden">
+          <main className="flex flex-col items-center w-full flex-1 overflow-hidden">
+            <Combobox
+              chatbots={assistants}
+              setCurrentChatbot={setCurrentChatbot}
+            />
             <div className="flex flex-col justify-between items-center w-full h-full py-4">
               <h1 className="text-2xl font-bold leading-[1.1] tracking-tighter text-center">
                 Chat With Your Docs
@@ -141,10 +176,10 @@ export default function ChatBot({ user }: any) {
               <main className={styles.main}>
                 <div className={styles.cloud}>
                   <div ref={messageListRef} className={styles.messagelist}>
-                    {messages.map((message, index) => {
+                    {messages.map((message: any, index: number) => {
                       let icon;
                       let className;
-                      if (message.type === 'apiMessage') {
+                      if (message.role === 'bot') {
                         icon = (
                           <Image
                             key={index}
@@ -186,36 +221,36 @@ export default function ChatBot({ user }: any) {
                               <ReactMarkdown>{message.message}</ReactMarkdown>
                             </div>
                           </div>
-                          {message.sourceDocs && (
-                        <div
-                          className="p-5"
-                          key={`sourceDocsAccordion-${index}`}
-                        >
-                          <Accordion
-                            type="single"
-                            collapsible
-                            className="flex-col"
-                          >
-                            {message.sourceDocs.map((doc, index) => (
-                              <div key={`messageSourceDocs-${index}`}>
-                                <AccordionItem value={`item-${index}`}>
-                                  <AccordionTrigger>
-                                    <h3>Source {index + 1}</h3>
-                                  </AccordionTrigger>
-                                  <AccordionContent>
-                                    <ReactMarkdown>
-                                      {doc.pageContent}
-                                    </ReactMarkdown>
-                                    <p className="mt-2">
-                                      <b>Source:</b> {doc.metadata.source}
-                                    </p>
-                                  </AccordionContent>
-                                </AccordionItem>
-                              </div>
-                            ))}
-                          </Accordion>
-                        </div>
-                      )}
+                          {/* {message.sourceDocs && (
+                            <div
+                              className="p-5"
+                              key={`sourceDocsAccordion-${index}`}
+                            >
+                              <Accordion
+                                type="single"
+                                collapsible
+                                className="flex-col"
+                              >
+                                {message.sourceDocs.map((doc, index) => (
+                                  <div key={`messageSourceDocs-${index}`}>
+                                    <AccordionItem value={`item-${index}`}>
+                                      <AccordionTrigger>
+                                        <h3>Source {index + 1}</h3>
+                                      </AccordionTrigger>
+                                      <AccordionContent>
+                                        <ReactMarkdown>
+                                          {doc.pageContent}
+                                        </ReactMarkdown>
+                                        <p className="mt-2">
+                                          <b>Source:</b> {doc.metadata.source}
+                                        </p>
+                                      </AccordionContent>
+                                    </AccordionItem>
+                                  </div>
+                                ))}
+                              </Accordion>
+                            </div>
+                          )} */}
                         </>
                       );
                     })}
