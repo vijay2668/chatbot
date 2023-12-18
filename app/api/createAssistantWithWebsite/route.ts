@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import axios from 'axios';
-import * as cheerio from 'cheerio';
 import { currentProfile } from '@/lib/current-profile';
 import OpenAI from 'openai';
-import { UploadFile, createAssistant } from '@/lib/OpenAI';
+import { createAssistant } from '@/lib/OpenAI';
 
 export async function POST(req: Request) {
   const profile = await currentProfile();
@@ -13,7 +12,6 @@ export async function POST(req: Request) {
     if (!profile) return new NextResponse('Unauthorized', { status: 401 });
 
     const {
-      websiteURL,
       websiteURLs,
       chatbotName,
       chatbotInstructions,

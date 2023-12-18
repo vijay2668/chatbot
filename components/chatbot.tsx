@@ -2,11 +2,9 @@
 
 import { useRef, useState, useEffect } from 'react';
 import styles from '@/styles/Home.module.css';
-import { Message } from '@/lib/types/chat';
 import Image from 'next/image';
 import ReactMarkdown from 'react-markdown';
 import LoadingDots from '@/components/LoadingDots';
-import { Document } from 'langchain/document';
 import { UserButton } from '@clerk/nextjs';
 import Link from 'next/link';
 import axios from 'axios';

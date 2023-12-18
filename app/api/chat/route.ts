@@ -1,12 +1,7 @@
-import type { Document } from 'langchain/document';
-import { OpenAIEmbeddings } from 'langchain/embeddings/openai';
-import { PineconeStore } from 'langchain/vectorstores/pinecone';
-import { makeChain } from '@/lib/makechain';
 import { NextResponse } from 'next/server';
 import { currentProfile } from '@/lib/current-profile';
 import {
   createMessage,
-  createThread,
   getMessages,
   runAssistant,
   runCheck,
@@ -78,7 +73,6 @@ export async function POST(req: Request) {
       console.log(runStatus)
     }
 
-    // unable to get all messages
     const messages = await getMessages(currentThread.id, openai);
 
     const lastMessageForRun = messages.data

@@ -1,6 +1,5 @@
-import { UploadFile, createAssistant, modifyAssistant } from '@/lib/OpenAI';
+import { UploadFile, modifyAssistant } from '@/lib/OpenAI';
 import { currentProfile } from '@/lib/current-profile';
-import { db } from '@/lib/db';
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 

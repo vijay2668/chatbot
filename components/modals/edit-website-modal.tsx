@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import toast from 'react-hot-toast';
 import { useModal } from '@/hooks/use-modal-store';
